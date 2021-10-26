@@ -1,6 +1,6 @@
 {
     "name": "com.anupackages.pooling",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "displayName": "ANU Pooling",
     "description": "An easy way to pool game objects, with the possibility to easily manage pools and expand the pools as needed",
     "keywords": [
@@ -11,6 +11,10 @@
       "optimization",
       "game object"
     ],
+    "dependencies": {
+      "com.anupackages.utils": "1.0.0",
+      "com.anupackages.extensions": "1.0.0"
+    },
     "author": {
       "name": "ANU CHEEKI BREEKI",
       "url": "https://github.com/ANU-CHEEKI-BREEKI"

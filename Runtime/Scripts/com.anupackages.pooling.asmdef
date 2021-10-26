@@ -1,8 +1,9 @@
 {
-    "name": "Core.Pooling",
+    "name": "com.anupackages.pooling",
     "rootNamespace": "",
     "references": [
-        "GUID:8e54b31f17d5ca244a2ee3df65281bbf"
+        "com.anupackages.utils",
+        "com.anupackages.extensions"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
