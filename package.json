@@ -1,0 +1,28 @@
+{
+    "name": "com.anupackages.pooling",
+    "version": "1.0.0",
+    "displayName": "ANU Pooling",
+    "description": "An easy way to pool game objects, with the possibility to easily manage pools and expand the pools as needed",
+    "keywords": [
+      "unity3d",
+      "upm",
+      "pool",
+      "pooling",
+      "optimization",
+      "game object"
+    ],
+    "author": {
+      "name": "ANU CHEEKI BREEKI",
+      "url": "https://github.com/ANU-CHEEKI-BREEKI"
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/ANU-CHEEKI-BREEKI/com.anupackages.pooling.git"
+    },
+    "license": "MIT",
+    "bugs": {
+      "url": "https://github.com/ANU-CHEEKI-BREEKI/com.anupackages.pooling/issues"
+    },
+    "homepage": "https://github.com/ANU-CHEEKI-BREEKI/com.anupackages.pooling#readme"
+  }
+  
