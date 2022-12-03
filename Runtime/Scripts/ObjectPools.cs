@@ -13,9 +13,8 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
     public static event Action<IEnumerable<ObjectPool>> Clean;
 
     private static Dictionary<int, ObjectPool> _pools = new Dictionary<int, ObjectPool>();
-    private static Dictionary<int, GameObject> _prebabByInstance = new Dictionary<int, GameObject>();
+    private static Dictionary<int, GameObject> _prefabByInstance = new Dictionary<int, GameObject>();
 
-    private static ObjectPools _instance;
     private static bool _cleaning = false;
     private Transform _destroyablePoolsParent;
 
@@ -30,56 +29,69 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
         }
     }
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Init()
+    {
+        SceneManager.sceneUnloaded -= SceneUnloaded;
+        _cleaning = false;
+        _pools.Clear();
+        _prefabByInstance.Clear();
+        Clean = null;
+        Created = null;
+    }
+
     protected override void Initialize()
     {
         // auto clearing on scene unloaded
-        SceneManager.sceneUnloaded += scene =>
+        SceneManager.sceneUnloaded += SceneUnloaded;
+    }
+
+    private static void SceneUnloaded(Scene scene)
+    {
+        _cleaning = true;
+
+        var toRemove = new LinkedList<int>();
+
+        toRemove.Clear();
+        foreach (var pair in _prefabByInstance)
         {
-            _cleaning = true;
+            var prefab = pair.Value;
+            var prefabId = prefab.GetInstanceID();
+            if (_pools.ContainsKey(prefabId) && _pools[prefabId].DestroyOnLoad)
+                toRemove.AddLast(pair.Key);
+        }
+        foreach (var key in toRemove)
+            _prefabByInstance.Remove(key);
 
-            var toRemove = new LinkedList<int>();
-
-            toRemove.Clear();
-            foreach (var pair in _prebabByInstance)
+        toRemove.Clear();
+        foreach (var pool in _pools)
+        {
+            if (pool.Value.DestroyOnLoad)
             {
-                var prefab = pair.Value;
-                var prefabId = prefab.GetInstanceID();
-                if (_pools.ContainsKey(prefabId) && _pools[prefabId].DestroyOnLoad)
-                    toRemove.AddLast(pair.Key);
+                pool.Value.Dispose();
+                toRemove.AddLast(pool.Key);
             }
-            foreach (var key in toRemove)
-                _prebabByInstance.Remove(key);
-
-            toRemove.Clear();
-            foreach (var pool in _pools)
+            else
             {
-                if (pool.Value.DestroyOnLoad)
-                {
-                    pool.Value.Dispose();
-                    toRemove.AddLast(pool.Key);
-                }
-                else
-                {
-                    pool.Value.ForceReturnAllInstancesImmediate();
-                }
+                pool.Value.ForceReturnAllInstancesImmediate();
             }
-            foreach (var key in toRemove)
-                _pools.Remove(key);
+        }
+        foreach (var key in toRemove)
+            _pools.Remove(key);
 
-            if (Instance._destroyablePoolsParent != null)
-            {
-                Destroy(Instance._destroyablePoolsParent.gameObject);
-                Instance._destroyablePoolsParent = null;
-            }
+        if (Instance._destroyablePoolsParent != null)
+        {
+            Destroy(Instance._destroyablePoolsParent.gameObject);
+            Instance._destroyablePoolsParent = null;
+        }
 
-            try
-            {
-                Clean?.Invoke(_pools.Values);
-            }
-            catch (Exception ex) { Debug.LogException(ex); }
+        try
+        {
+            Clean?.Invoke(_pools.Values);
+        }
+        catch (Exception ex) { Debug.LogException(ex); }
 
-            _cleaning = false;
-        };
+        _cleaning = false;
     }
 
     /// <summary>
@@ -95,8 +107,8 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
         if (HasPoolFor(prefab))
         {
             Debug.LogWarning(
-                $"Pool for this prefab already ititialized and can not be reinitialized again.",
-                _pools[prefab.GetInstanceID()].ReleacedInstancesParent
+                $"Pool for this prefab already initialized and can not be reinitialized again.",
+                _pools[prefab.GetInstanceID()].ReleasedInstancesParent
             );
             return;
         }
@@ -117,10 +129,10 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
         if (instance == null)
             return false;
         var instanceId = instance.GetInstanceID();
-        if (!_prebabByInstance.ContainsKey(instanceId))
+        if (!_prefabByInstance.ContainsKey(instanceId))
             return false;
 
-        var prefabId = _prebabByInstance[instanceId].GetInstanceID();
+        var prefabId = _prefabByInstance[instanceId].GetInstanceID();
         if (!_pools.ContainsKey(prefabId))
             return false;
 
@@ -224,9 +236,9 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
         _pools.Add(id, newPool);
 
         if (newPool.DestroyOnLoad)
-            newPool.ReleacedInstancesParent.parent = Instance.DestroyablePoolsParent;
+            newPool.ReleasedInstancesParent.parent = Instance.DestroyablePoolsParent;
         else
-            newPool.ReleacedInstancesParent.parent = Instance.transform;
+            newPool.ReleasedInstancesParent.parent = Instance.transform;
 
         try
         {
@@ -242,10 +254,10 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
             return null;
 
         var instanceId = instance.gameObject.GetInstanceID();
-        if (!_prebabByInstance.ContainsKey(instanceId))
+        if (!_prefabByInstance.ContainsKey(instanceId))
             return null;
         else
-            return GetPool(_prebabByInstance[instanceId]);
+            return GetPool(_prefabByInstance[instanceId]);
     }
 
     /// <summary>
@@ -260,16 +272,16 @@ public sealed partial class ObjectPools : Singletone<ObjectPools>
         //check if it instance of any another prefab
         //and take those prefab insted
         var prefabId = prefab.gameObject.GetInstanceID();
-        if (_prebabByInstance.ContainsKey(prefabId))
-            prefab = _prebabByInstance[prefabId];
+        if (_prefabByInstance.ContainsKey(prefabId))
+            prefab = _prefabByInstance[prefabId];
 
         var pool = GetPool(prefab);
         return pool.WithInit((instance) =>
         {
             var instanceId = instance.gameObject.GetInstanceID();
-            //cahce prefab for this instance to be able get it in Retuen method
-            if (!_prebabByInstance.ContainsKey(instanceId))
-                _prebabByInstance.Add(instanceId, prefab);
+            //cache prefab for this instance to be able get it in Return method
+            if (!_prefabByInstance.ContainsKey(instanceId))
+                _prefabByInstance.Add(instanceId, prefab);
         });
     }
     /// <summary>

@@ -12,6 +12,6 @@ public interface IPoolable
 
 public static class PoolableExtensions
 {
-    public static void Releace(this IPoolable poolable) => ObjectPools.Return(poolable as Component);
+    public static void Release(this IPoolable poolable) => ObjectPools.Return(poolable as Component);
     public static bool IsInPool(this IPoolable poolable) => ObjectPools.IsInPool(poolable as Component);
 }

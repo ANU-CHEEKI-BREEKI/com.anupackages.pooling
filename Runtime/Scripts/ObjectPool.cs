@@ -11,7 +11,7 @@ namespace Pooling
     public class ObjectPool
     {
         private GameObject _prefab;
-        private Transform _releacedInstancesParent;
+        private Transform _releasedInstancesParent;
         private CoroutineHolder _coroutineHolder;
         private bool _destroyOnLoad;
 
@@ -26,8 +26,8 @@ namespace Pooling
 
         private InitializationSettings _initSettings;
 
-        private IPoolColliction<GameObject> _releacedInstances;
-        private HashSet<int> _releacedInstancesIds = new HashSet<int>();
+        private IPoolCollection<GameObject> _releasedInstances;
+        private HashSet<int> _releasedInstancesIds = new HashSet<int>();
 
         /// <summary>
         /// All created by this pool instances.
@@ -41,10 +41,10 @@ namespace Pooling
         public event Action<ObjectPool, GameObject> Returned;
 
         public GameObject Prefab => _prefab;
-        public Transform ReleacedInstancesParent => _releacedInstancesParent;
+        public Transform ReleasedInstancesParent => _releasedInstancesParent;
         public bool DestroyOnLoad => _destroyOnLoad;
 
-        public int ReleacedInstancesCount => _releacedInstancesIds.Count;
+        public int ReleasedInstancesCount => _releasedInstancesIds.Count;
         public int CreatedInstancesCount => _createdInstancesIds.Count;
 
         public enum CollectionType { Stack, Queue }
@@ -61,27 +61,27 @@ namespace Pooling
             switch (initSettings.collectionType)
             {
                 case CollectionType.Stack:
-                    _releacedInstances = new PoolStack<GameObject>();
+                    _releasedInstances = new PoolStack<GameObject>();
                     break;
                 case CollectionType.Queue:
-                    _releacedInstances = new PoolQeue<GameObject>();
+                    _releasedInstances = new PoolQueue<GameObject>();
                     break;
                 default:
                     Debug.LogException(new NotImplementedException($"{initSettings.collectionType}. Using {CollectionType.Stack} instead."));
-                    _releacedInstances = new PoolStack<GameObject>();
+                    _releasedInstances = new PoolStack<GameObject>();
                     break;
             }
 
-            _releacedInstancesParent = new GameObject(
-                string.IsNullOrEmpty(initSettings.releacedInstancesParent)
+            _releasedInstancesParent = new GameObject(
+                string.IsNullOrEmpty(initSettings.releasedInstancesParent)
                 ? $"pool-{(initSettings.destroyPoolOnSceneLoaded ? "t" : "f")}-{prefab.name}"
-                : initSettings.releacedInstancesParent
+                : initSettings.releasedInstancesParent
             ).transform;
             if (!initSettings.destroyPoolOnSceneLoaded)
-                GameObject.DontDestroyOnLoad(_releacedInstancesParent.gameObject);
+                GameObject.DontDestroyOnLoad(_releasedInstancesParent.gameObject);
             _destroyOnLoad = initSettings.destroyPoolOnSceneLoaded;
 
-            _coroutineHolder = _releacedInstancesParent.gameObject.AddComponent<CoroutineHolder>();
+            _coroutineHolder = _releasedInstancesParent.gameObject.AddComponent<CoroutineHolder>();
 
             var prefabTransform = prefab.transform;
             _initialLocalPosition = prefabTransform.localPosition;
@@ -97,7 +97,7 @@ namespace Pooling
                 for (int i = 0; i < initSettings.initialCapacity; i++)
                 {
                     tempKeeper.AddLast(
-                        WithInit(initSettings.initializator)
+                        WithInit(initSettings.initializer)
                         .GetOrCreate()
                     );
                 }
@@ -111,7 +111,7 @@ namespace Pooling
         {
             if (instance == null)
                 return false;
-            return _releacedInstancesIds.Contains(instance.GetInstanceID());
+            return _releasedInstancesIds.Contains(instance.GetInstanceID());
         }
         public bool IsFromPool(GameObject instance)
         {
@@ -129,11 +129,11 @@ namespace Pooling
                 if (instance != null)
                     GameObject.Destroy(instance);
 
-            if (_releacedInstancesParent != null)
-                GameObject.Destroy(_releacedInstancesParent.gameObject);
+            if (_releasedInstancesParent != null)
+                GameObject.Destroy(_releasedInstancesParent.gameObject);
 
-            _releacedInstances.Clear();
-            _releacedInstancesIds.Clear();
+            _releasedInstances.Clear();
+            _releasedInstancesIds.Clear();
             _createdInstances.Clear();
             _createdInstancesIds.Clear();
             _prefab = null;
@@ -153,9 +153,9 @@ namespace Pooling
         {
             GameObject instance = null;
             var isNewInstance = false;
-            if (_releacedInstances.Count > 0)
+            if (_releasedInstances.Count > 0)
             {
-                instance = _releacedInstances.Pop();
+                instance = _releasedInstances.Pop();
             }
             else
             {
@@ -168,7 +168,7 @@ namespace Pooling
             if (instance == null)
                 instance = GetOrCreate(settings);
             else
-                _releacedInstancesIds.Remove(instance.gameObject.GetInstanceID());
+                _releasedInstancesIds.Remove(instance.gameObject.GetInstanceID());
 
             settings?.Init(new PreInitializationArgs(
                 instance,
@@ -201,14 +201,14 @@ namespace Pooling
                 _delayers[instanceId] = null;
             }
 
-            _releacedInstances.Push(instance);
-            _releacedInstancesIds.Add(instanceId);
+            _releasedInstances.Push(instance);
+            _releasedInstancesIds.Add(instanceId);
 
             var poolable = instance.GetComponents<IPoolable>();
             for (int i = 0; i < poolable.Length; i++)
                 poolable[i].DisposeOnReturnedToPool();
             instance.SetActive(false);
-            instance.transform.SetParent(_releacedInstancesParent);
+            instance.transform.SetParent(_releasedInstancesParent);
 
             try
             {
@@ -250,8 +250,8 @@ namespace Pooling
                 return false;
             }
 
-            //olready in pool
-            if (_releacedInstancesIds.Contains(instanceId))
+            //already in pool
+            if (_releasedInstancesIds.Contains(instanceId))
                 return false;
 
             return true;
@@ -261,19 +261,19 @@ namespace Pooling
         /// DO NOT cache return value.
         /// It is shared in all ObjectPool calls. And it resets in WithInit call;
         /// </summary>
-        /// <param name="preInitializator">calls right before IInitializationSettings.WithPreInitialization</param>
-        public IInitializationSettings WithInit(Action<GameObject> preInitializator)
+        /// <param name="preInitializer">calls right before IInitializationSettings.WithPreInitialization</param>
+        public IInitializationSettings WithInit(Action<GameObject> preInitializer)
         {
             _initSettings.Reset();
             _initSettings._pool = this;
-            _initSettings._prePreInitializator = preInitializator;
+            _initSettings._prePreInitializer = preInitializer;
             return _initSettings;
         }
 
         private class InitializationSettings : AInitializationSettings
         {
             public ObjectPool _pool;
-            public Action<GameObject> _prePreInitializator;
+            public Action<GameObject> _prePreInitializer;
 
             public override GameObject GetOrCreate() => _pool.GetOrCreate(this);
 
@@ -332,23 +332,23 @@ namespace Pooling
 
                 try
                 {
-                    _prePreInitializator?.Invoke(args.instance);
+                    _prePreInitializer?.Invoke(args.instance);
                 }
                 catch (Exception ex) { Debug.LogException(ex); }
                 try
                 {
-                    _persistentPreInitializator?.Invoke(args);
+                    _persistentPreInitializer?.Invoke(args);
                 }
                 catch (Exception ex) { Debug.LogException(ex); }
                 try
                 {
-                    _preInitializator?.Invoke(args);
+                    _preInitializer?.Invoke(args);
                 }
                 catch (Exception ex) { Debug.LogException(ex); }
             }
         }
 
-        private interface IPoolColliction<T> : IEnumerable<T>, IEnumerable, IReadOnlyCollection<T>, ICollection
+        private interface IPoolCollection<T> : IEnumerable<T>, IEnumerable, IReadOnlyCollection<T>, ICollection
         {
             new int Count { get; }
             void Clear();
@@ -358,8 +358,8 @@ namespace Pooling
             T Peek();
             T Pop();
         }
-        private class PoolStack<T> : Stack<T>, IPoolColliction<T> { }
-        private class PoolQeue<T> : Queue<T>, IPoolColliction<T>
+        private class PoolStack<T> : Stack<T>, IPoolCollection<T> { }
+        private class PoolQueue<T> : Queue<T>, IPoolCollection<T>
         {
             public T Pop() => this.Dequeue();
             public void Push(T item) => this.Enqueue(item);
@@ -368,12 +368,14 @@ namespace Pooling
         public class PoolInitSettings
         {
             public int initialCapacity = 0;
-            public string releacedInstancesParent = null;
+            public string releasedInstancesParent = null;
             public bool destroyPoolOnSceneLoaded = true;
             public CollectionType collectionType = CollectionType.Stack;
-            public Action<GameObject> initializator = null;
+            public Action<GameObject> initializer = null;
         }
     }
+
+    public enum InitializerSetType { Replace, Add }
 
     public interface IInitializationSettings
     {
@@ -390,11 +392,17 @@ namespace Pooling
 
         IInitializationSettings WithAutoReturn(float delay, bool unscaled = false);
         /// <summary>
-        /// preInitializator calls after all WithXXX methods
+        /// preInitializer calls after all WithXXX methods
         /// but before instance.SetActive(true) and initialization through IPoolable.
-        /// persistent called first.
+        /// 
+        /// ---
+        /// 
+        /// initializers with InitializerSetType.Add and InitializerSetType.Replace sets independently
+        /// so if you call this method 4 times - 2 wit Add and 2 with Replace - there will be 3 initializers - two from Add and onr lsat from Replace
+        /// 
+        /// initializers with InitializerSetType.Add called first.
         /// </summary>
-        IInitializationSettings WithPreInitialization(Action<PreInitializationArgs> preInitializator, bool persistent);
+        IInitializationSettings WithPreInitialization(Action<PreInitializationArgs> preInitializer, InitializerSetType setType);
 
         GameObject GetOrCreate();
     }
@@ -431,8 +439,8 @@ namespace Pooling
         protected float _returnDelay;
         protected bool _useUnscaledDelay;
 
-        protected Action<PreInitializationArgs> _persistentPreInitializator;
-        protected Action<PreInitializationArgs> _preInitializator;
+        protected Action<PreInitializationArgs> _persistentPreInitializer;
+        protected Action<PreInitializationArgs> _preInitializer;
 
         public abstract GameObject GetOrCreate();
 
@@ -449,8 +457,8 @@ namespace Pooling
             _isLocalScale = false;
 
             _autoReturn = false;
-            _persistentPreInitializator = null;
-            _preInitializator = null;
+            _persistentPreInitializer = null;
+            _preInitializer = null;
         }
 
         public IInitializationSettings WithAutoReturn(float delay, bool unscaled = false)
@@ -512,12 +520,14 @@ namespace Pooling
             return this;
         }
 
-        public IInitializationSettings WithPreInitialization(Action<PreInitializationArgs> preInitializator, bool persistent = false)
+        public IInitializationSettings WithPreInitialization(Action<PreInitializationArgs> preInitializer, InitializerSetType setType)
         {
-            if (persistent)
-                _persistentPreInitializator += preInitializator;
+            if (setType == InitializerSetType.Add)
+                _persistentPreInitializer += preInitializer;
+            else if (setType == InitializerSetType.Replace)
+                _preInitializer = preInitializer;
             else
-                _preInitializator = preInitializator;
+                throw new System.NotImplementedException(setType.ToString());
             return this;
         }
     }

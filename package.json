@@ -1,6 +1,6 @@
 {
     "name": "com.anupackages.pooling",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "displayName": "ANU Pooling",
     "description": "An easy way to pool game objects, with the possibility to easily manage pools and expand the pools as needed",
     "keywords": [
@@ -12,7 +12,7 @@
       "game object"
     ],
     "dependencies": {
-      "com.anupackages.utils": "1.0.0",
+      "com.anupackages.utils": "1.0.1",
       "com.anupackages.extensions": "1.0.0"
     },
     "author": {
